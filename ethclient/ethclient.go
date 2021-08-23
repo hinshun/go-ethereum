@@ -95,7 +95,7 @@ func (ec *Client) BlockNumber(ctx context.Context) (uint64, error) {
 }
 
 type rpcBlock struct {
-	Hash         common.Hash      `json:"hash"`
+	Hash         *common.Hash     `json:"hash"`
 	Transactions []rpcTransaction `json:"transactions"`
 	UncleHashes  []common.Hash    `json:"uncles"`
 }
@@ -132,13 +132,13 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	}
 	// Load uncles because they are not included in the block response.
 	var uncles []*types.Header
-	if len(body.UncleHashes) > 0 {
+	if len(body.UncleHashes) > 0 && body.Hash != nil {
 		uncles = make([]*types.Header, len(body.UncleHashes))
 		reqs := make([]rpc.BatchElem, len(body.UncleHashes))
 		for i := range reqs {
 			reqs[i] = rpc.BatchElem{
 				Method: "eth_getUncleByBlockHashAndIndex",
-				Args:   []interface{}{body.Hash, hexutil.EncodeUint64(uint64(i))},
+				Args:   []interface{}{*body.Hash, hexutil.EncodeUint64(uint64(i))},
 				Result: &uncles[i],
 			}
 		}
@@ -157,8 +157,8 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	// Fill the sender cache of transactions in the block.
 	txs := make([]*types.Transaction, len(body.Transactions))
 	for i, tx := range body.Transactions {
-		if tx.From != nil {
-			setSenderFromServer(tx.tx, *tx.From, body.Hash)
+		if tx.From != nil && body.Hash != nil {
+			setSenderFromServer(tx.tx, *tx.From, *body.Hash)
 		}
 		txs[i] = tx.tx
 	}
